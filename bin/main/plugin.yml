@@ -1,0 +1,26 @@
+name: CustomFishing
+version: 1.0
+main: Ora000.customfishing.Customfishing
+description: カスタムな魚が釣れるプラグイン
+website: https:github.com/woxlo1
+api-version: 1.19
+depend: Vault
+authors: #作者の名前はマインクラフトのID
+  - woxloi
+  - Ora000_mp0
+commands:
+  customfish:
+    description: Manage custom fishes
+    aliases: cf
+  filleting:
+    description: Filleting settings
+    aliases: ft
+permissions:
+  customfishing.sell:
+    default: true
+  customfishing.list:
+    default: true
+  customfishing.admin:
+    default: op
+  customfishing.filleting.admin:
+    default: op

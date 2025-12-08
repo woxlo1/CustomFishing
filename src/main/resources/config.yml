@@ -1,0 +1,24 @@
+sell:
+  base-price: 10   # 最低価格（全魚共通）
+
+  rarity-multiplier:
+    COMMON: 1.0
+    RARE: 1.5
+    EPIC: 2.5
+    LEGENDARY: 5.0
+
+  size:
+    min: 5
+    max: 100
+    price-per-cm: 0.8
+
+  freshness:
+    multiplier:
+      90: 1.5
+      70: 1.2
+      50: 1.0
+      30: 0.7
+      0: 0.4
+
+  fillet:
+    multiplier: 0.6   # 切り身は元の魚価格 × この倍率
