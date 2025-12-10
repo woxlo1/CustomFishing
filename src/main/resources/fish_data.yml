@@ -1,0 +1,10 @@
+fishes:
+  fish0:
+    name: マグロ
+    material: COD
+    customModelData: 1001
+    rarity: RARE
+    probability: 0.05
+    lore: "巨大な海の王者"
+    minSize: 120
+    maxSize: 300

@@ -3,6 +3,7 @@ package Ora000.customfishing.command;
 import Ora000.customfishing.Customfishing;
 import Ora000.customfishing.data.FishDataManager;
 import Ora000.customfishing.menu.SellFishMenu;
+import Ora000.customfishing.menu.itemindex.RaritySelectMenu;
 import Ora000.customfishing.model.CustomFish;
 import Ora000.customfishing.util.CustomFishingRod;
 import org.bukkit.ChatColor;
@@ -36,15 +37,35 @@ public class CustomFishCommand implements CommandExecutor {
             s.sendMessage(Customfishing.PREFIX + "§6=== カスタム釣り ===");
             s.sendMessage("§e/customfish list");
             s.sendMessage("§e/customfish sell");
+            s.sendMessage("§e/customfish ii §7- 釣り図鑑を開く");
 
             if (s.hasPermission("customfishing.admin")) {
                 s.sendMessage("§c=== 管理者 ===");
-                s.sendMessage("§e/customfish add <name> <price> <material> <lore> <min> <max> <chance>");
+                s.sendMessage("§e/customfish add <name> <price> <rarity> <lore> <min> <max> <cmd>");
                 s.sendMessage("§e/customfish remove <番号>");
                 s.sendMessage("§e/customfish reload");
                 s.sendMessage("§e/customfish rod create | remove");
                 s.sendMessage("§e/customfish on / off");
             }
+            return true;
+        }
+
+        // ===============================
+        // 図鑑 (ii)
+        // ===============================
+        if (a[0].equalsIgnoreCase("ii")) {
+
+            if (!(s instanceof Player p)) {
+                s.sendMessage("§cプレイヤー専用です。");
+                return true;
+            }
+
+            if (!s.hasPermission("customfishing.list")) {
+                p.sendMessage(Customfishing.PREFIX + "§c権限がありません。");
+                return true;
+            }
+
+            p.openInventory(new RaritySelectMenu(plugin).getInventory());
             return true;
         }
 
@@ -107,7 +128,7 @@ public class CustomFishCommand implements CommandExecutor {
         }
 
         // ===============================
-        // 管理者チェック
+        // 管理者権限チェック
         // ===============================
         if (!s.hasPermission("customfishing.admin")) {
             s.sendMessage(Customfishing.PREFIX + "§c管理者権限がありません。");

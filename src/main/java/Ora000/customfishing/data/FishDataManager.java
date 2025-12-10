@@ -1,13 +1,14 @@
 package Ora000.customfishing.data;
 
 import Ora000.customfishing.model.CustomFish;
+import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,6 +22,9 @@ public class FishDataManager {
 
     public final List<CustomFish> fishes = new ArrayList<>();
 
+    // ==================================================
+    // constructor
+    // ==================================================
     public FishDataManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.fishDataFile = new File(plugin.getDataFolder(), "fish_data.yml");
@@ -29,14 +33,14 @@ public class FishDataManager {
             try {
                 fishDataFile.createNewFile();
             } catch (IOException e) {
-                plugin.getLogger().severe("fish_data.yml を作成できません: " + e.getMessage());
+                plugin.getLogger().severe("fish_data.yml 作成失敗: " + e.getMessage());
             }
         }
         config = YamlConfiguration.loadConfiguration(fishDataFile);
     }
 
     // ==================================================
-    // 読み込み
+    // load
     // ==================================================
     public void loadFishData() {
         fishes.clear();
@@ -46,6 +50,9 @@ public class FishDataManager {
 
         for (String key : config.getConfigurationSection("fishes").getKeys(false)) {
             String p = "fishes." + key;
+
+            Material material = Material.matchMaterial(
+                    config.getString(p + ".material", "COD"));
 
             CustomFish f = new CustomFish(
                     config.getString(p + ".name"),
@@ -57,8 +64,10 @@ public class FishDataManager {
                     config.getInt(p + ".customModelData")
             );
 
+            // ===== filleting =====
             if (config.contains(p + ".filleting")) {
                 String fp = p + ".filleting";
+
                 f.filletingEnabled = config.getBoolean(fp + ".enabled");
                 f.filletName = config.getString(fp + ".name", "");
                 f.filletMinAmount = config.getInt(fp + ".minAmount");
@@ -69,17 +78,17 @@ public class FishDataManager {
                 f.minFreshness = config.getInt(fp + ".minFreshness");
                 f.maxFreshness = config.getInt(fp + ".maxFreshness");
 
-                if (config.contains(fp + ".potionEffects")) {
-                    for (Map<?, ?> map : config.getMapList(fp + ".potionEffects")) {
-                        PotionEffectType type =
-                                PotionEffectType.getByName((String) map.get("type"));
-                        if (type != null) {
-                            f.potionEffects.add(new PotionEffect(
-                                    type,
-                                    (int) map.get("duration"),
-                                    (int) map.get("amplifier")
-                            ));
-                        }
+                // potion effects
+                f.potionEffects.clear();
+                for (Map<?, ?> map : config.getMapList(fp + ".potionEffects")) {
+                    PotionEffectType type =
+                            PotionEffectType.getByName((String) map.get("type"));
+                    if (type != null) {
+                        f.potionEffects.add(new PotionEffect(
+                                type,
+                                (int) map.get("duration"),
+                                (int) map.get("amplifier")
+                        ));
                     }
                 }
             }
@@ -88,7 +97,7 @@ public class FishDataManager {
     }
 
     // ==================================================
-    // 保存
+    // save
     // ==================================================
     public void saveFishData() {
         config.set("fishes", null);
@@ -105,6 +114,7 @@ public class FishDataManager {
             config.set(p + ".maxSize", f.maxSize);
             config.set(p + ".customModelData", f.customModelData);
 
+            // ===== filleting =====
             if (f.filletingEnabled) {
                 String fp = p + ".filleting";
                 config.set(fp + ".enabled", true);
@@ -116,6 +126,17 @@ public class FishDataManager {
                 config.set(fp + ".customModelData", f.filletCustomModelData);
                 config.set(fp + ".minFreshness", f.minFreshness);
                 config.set(fp + ".maxFreshness", f.maxFreshness);
+
+                // ✅ potionEffects 保存（重要）
+                List<Map<String, Object>> list = new ArrayList<>();
+                for (PotionEffect pe : f.potionEffects) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("type", pe.getType().getName());
+                    m.put("duration", pe.getDuration());
+                    m.put("amplifier", pe.getAmplifier());
+                    list.add(m);
+                }
+                config.set(fp + ".potionEffects", list);
             }
         }
 
@@ -127,36 +148,29 @@ public class FishDataManager {
     }
 
     // ==================================================
-    // ★ アイテム判定（static）
+    // item check
     // ==================================================
     public static boolean isCustomFishItem(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        if (!meta.hasLore()) return false;
-
-        for (String l : meta.getLore()) {
-            if (l.startsWith("§8§l[ID:")) return true;
-        }
-        return false;
+        return hasLoreKey(item, "§8§l[ID:");
     }
 
     public static boolean isFilletItem(ItemStack item) {
+        return hasLoreKey(item, "§8§l[FILLET:");
+    }
+
+    private static boolean hasLoreKey(ItemStack item, String key) {
         if (item == null || !item.hasItemMeta()) return false;
         ItemMeta meta = item.getItemMeta();
         if (!meta.hasLore()) return false;
-
-        for (String l : meta.getLore()) {
-            if (l.startsWith("§8§l[FILLET:")) return true;
-        }
-        return false;
+        return meta.getLore().stream().anyMatch(l -> l.startsWith(key));
     }
 
     // ==================================================
-    // 売却価格計算（核心）
+    // sell price
     // ==================================================
     public int getSellPrice(ItemStack item) {
-
         if (item == null || !item.hasItemMeta()) return 0;
+
         ItemMeta meta = item.getItemMeta();
         if (!meta.hasLore()) return 0;
 
@@ -166,42 +180,39 @@ public class FishDataManager {
         boolean fillet = false;
 
         for (String l : meta.getLore()) {
-            if (l.startsWith("§8§l[ID:")) {
-                fishId = l.replace("§8§l[ID:", "").replace("]", "");
-            }
+            if (l.startsWith("§8§l[ID:")) fishId = extract(l);
             if (l.startsWith("§8§l[FILLET:")) {
-                fishId = l.replace("§8§l[FILLET:", "").replace("]", "");
+                fishId = extract(l);
                 fillet = true;
             }
-            if (l.startsWith("§7大きさ: ")) {
-                size = Integer.parseInt(
-                        l.replace("§7大きさ: ", "").replace("cm", "")
-                );
-            }
-            if (l.startsWith("§8§l[FRESH:")) {
-                freshness = Integer.parseInt(
-                        l.replace("§8§l[FRESH:", "").replace("]", "")
-                );
-            }
+            if (l.startsWith("§7大きさ: "))
+                size = Integer.parseInt(l.replace("§7大きさ: ", "").replace("cm", ""));
+            if (l.startsWith("§8§l[FRESH:"))
+                freshness = Integer.parseInt(l.replace("§8§l[FRESH:", "").replace("]", ""));
         }
-
-        if (fishId == null) return 0;
 
         CustomFish fish = getFishByName(fishId);
         if (fish == null) return 0;
 
         double base = fillet ? 50 : 100;
-        double rarity = getRarityMultiplier(fish.rarity);
-        double sizeMul = size > 0 ? (double) size / fish.maxSize : 1.0;
-        double freshMul = freshness / 100.0;
+        double price =
+                base *
+                        getRarityMultiplier(fish.rarity) *
+                        (size > 0 ? (double) size / fish.maxSize : 1.0) *
+                        (freshness / 100.0);
 
-        return Math.max(1, (int) (base * rarity * sizeMul * freshMul));
+        return Math.max(1, (int) price);
+    }
+
+    private String extract(String l) {
+        return l.substring(l.indexOf(":") + 1, l.length() - 1);
     }
 
     // ==================================================
-    // 補助
+    // utility
     // ==================================================
     public CustomFish getFishByName(String name) {
+        if (name == null) return null;
         for (CustomFish f : fishes) {
             if (f.name.equalsIgnoreCase(name)) return f;
         }
@@ -209,7 +220,7 @@ public class FishDataManager {
     }
 
     private double getRarityMultiplier(String rarity) {
-        return switch (rarity) {
+        return switch (rarity.toUpperCase()) {
             case "COMMON" -> 1.0;
             case "UNCOMMON" -> 1.5;
             case "RARE" -> 2.5;
@@ -217,5 +228,22 @@ public class FishDataManager {
             case "LEGENDARY" -> 8.0;
             default -> 1.0;
         };
+    }
+
+    // ==================================================
+    // ★ 図鑑用 API
+    // ==================================================
+    public Set<String> getAllRarities() {
+        Set<String> set = new LinkedHashSet<>();
+        for (CustomFish f : fishes) set.add(f.rarity.toUpperCase());
+        return set;
+    }
+
+    public List<CustomFish> getFishByRarity(String rarity) {
+        List<CustomFish> list = new ArrayList<>();
+        for (CustomFish f : fishes) {
+            if (f.rarity.equalsIgnoreCase(rarity)) list.add(f);
+        }
+        return list;
     }
 }

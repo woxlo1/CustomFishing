@@ -1,43 +1,75 @@
 package Ora000.customfishing.data;
 
-import java.util.HashMap;
-import java.util.Map;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.UUID;
 
 public class PlayerCatchData {
 
-    // 魚ごとの最大サイズ・釣った回数
-    public static class FishRecord {
-        public int maxSize;
-        public int totalCaught;
+    private final JavaPlugin plugin;
+    private final File dir;
 
-        public FishRecord(int maxSize, int totalCaught) {
-            this.maxSize = maxSize;
-            this.totalCaught = totalCaught;
+    public PlayerCatchData(JavaPlugin plugin) {
+        this.plugin = plugin;
+        this.dir = new File(plugin.getDataFolder(), "playerdata");
+        if (!dir.exists()) dir.mkdirs();
+    }
+
+    private File getFile(UUID uuid) {
+        return new File(dir, uuid + ".yml");
+    }
+
+    private YamlConfiguration getConfig(UUID uuid) {
+        return YamlConfiguration.loadConfiguration(getFile(uuid));
+    }
+
+    // ===============================
+    // 記録
+    // ===============================
+    public void record(UUID uuid, String fish, int size) {
+        YamlConfiguration c = getConfig(uuid);
+        String p = "fishes." + fish;
+
+        int count = c.getInt(p + ".count", 0) + 1;
+        int max = Math.max(c.getInt(p + ".max", 0), size);
+        int min = c.contains(p + ".min")
+                ? Math.min(c.getInt(p + ".min"), size)
+                : size;
+
+        c.set(p + ".count", count);
+        c.set(p + ".max", max);
+        c.set(p + ".min", min);
+
+        save(uuid, c);
+    }
+
+    // ===============================
+    // 図鑑取得API
+    // ===============================
+    public boolean hasCaught(UUID uuid, String fish) {
+        return getCount(uuid, fish) > 0;
+    }
+
+    public int getCount(UUID uuid, String fish) {
+        return getConfig(uuid).getInt("fishes." + fish + ".count", 0);
+    }
+
+    public int getMax(UUID uuid, String fish) {
+        return getConfig(uuid).getInt("fishes." + fish + ".max", 0);
+    }
+
+    public int getMin(UUID uuid, String fish) {
+        return getConfig(uuid).getInt("fishes." + fish + ".min", 0);
+    }
+
+    private void save(UUID uuid, YamlConfiguration c) {
+        try {
+            c.save(getFile(uuid));
+        } catch (IOException e) {
+            plugin.getLogger().severe("PlayerCatchData save failed: " + uuid);
         }
-    }
-
-    // プレイヤーUUID -> 魚名 -> FishRecord
-    private final Map<String, Map<String, FishRecord>> playerData = new HashMap<>();
-
-    public Map<String, FishRecord> getPlayer(String uuid) {
-        return playerData.computeIfAbsent(uuid, k -> new HashMap<>());
-    }
-
-    public void recordCatch(String uuid, String fishName, int size) {
-        Map<String, FishRecord> fishMap = getPlayer(uuid);
-        FishRecord record = fishMap.get(fishName);
-
-        if (record == null) {
-            fishMap.put(fishName, new FishRecord(size, 1));
-        } else {
-            record.totalCaught++;
-            if (size > record.maxSize) {
-                record.maxSize = size;
-            }
-        }
-    }
-
-    public Map<String, Map<String, FishRecord>> getAllData() {
-        return playerData;
     }
 }

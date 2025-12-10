@@ -5,11 +5,12 @@ import Ora000.customfishing.antimacro.AntiMacroManager;
 import Ora000.customfishing.command.CustomFishCommand;
 import Ora000.customfishing.command.FilletingCommand;
 import Ora000.customfishing.data.FishDataManager;
+import Ora000.customfishing.data.PlayerCatchData;
 import Ora000.customfishing.data.ServerRecordData;
 import Ora000.customfishing.listener.FishingListener;
+import Ora000.customfishing.menu.itemindex.ItemIndexListener;
 import Ora000.customfishing.util.FishingTabCompleter;
 import Ora000.customfishing.util.SellLogger;
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -29,61 +30,55 @@ public class Customfishing extends JavaPlugin {
     // ✅ マクロ対策
     private AntiMacroManager antiMacroManager;
 
-    // ===============================
-    // サーバーレコード管理
-    // ===============================
+    // ✅ サーバーレコード
     private ServerRecordData serverRecordData;
+
+    private PlayerCatchData playerCatchData;
+
+    private FishDataManager fishDataManager;
 
     @Override
     public void onEnable() {
 
+        // フォルダ作成
         if (!getDataFolder().exists()) {
             getDataFolder().mkdirs();
         }
 
-        // ===============================
-        // データ
-        // ===============================
-        dataManager = new FishDataManager(this);
-        dataManager.loadFishData();
+        // 魚データ読み込み
+        fishDataManager = new FishDataManager(this);
+        fishDataManager.loadFishData();
 
-        // ===============================
-        // サーバーレコード
-        // ===============================
+        // サーバーレコード初期化（ファイルは plugin ディレクトリ配下）
         serverRecordData = new ServerRecordData(new File(getDataFolder(), "server-records.yml"));
         serverRecordData.load();
 
-        // ===============================
-        // コマンド
-        // ===============================
-        getCommand("customfish")
-                .setExecutor(new CustomFishCommand(this, dataManager));
-        getCommand("filleting")
-                .setExecutor(new FilletingCommand(this, dataManager));
+        // プレイヤーデータ初期化
+        playerCatchData = new PlayerCatchData(this);
 
-        FishingTabCompleter tab = new FishingTabCompleter(this, dataManager);
+        // コマンド登録
+        getCommand("customfish").setExecutor(new CustomFishCommand(this, fishDataManager));
+        getCommand("filleting").setExecutor(new FilletingCommand(this, fishDataManager));
+
+        // タブ補完
+        FishingTabCompleter tab = new FishingTabCompleter(this, fishDataManager);
         getCommand("customfish").setTabCompleter(tab);
         getCommand("filleting").setTabCompleter(tab);
 
-        // ===============================
-        // リスナー
-        // ===============================
-        getServer().getPluginManager().registerEvents(
-                new FishingListener(this, dataManager), this);
+        // リスナー登録（釣り処理）
+        getServer().getPluginManager().registerEvents(new FishingListener(this, fishDataManager), this);
 
-        // ✅ マクロ対策 初期化 & 登録
+        getServer().getPluginManager()
+                .registerEvents(new ItemIndexListener(this), this);
+
+        // マクロ対策初期化＆登録
         antiMacroManager = new AntiMacroManager(this);
-        getServer().getPluginManager().registerEvents(
-                new AntiMacroListener(this), this);
+        getServer().getPluginManager().registerEvents(new AntiMacroListener(this), this);
 
-        // ===============================
-        // Vault
-        // ===============================
+        // Vault 初期化（VaultManager 実装に依存）
         vaultManager = new VaultManager();
 
-        // ===============================
-        // 売却ログ
-        // ===============================
+        // 売却ログ初期化
         SellLogger.init(getDataFolder());
 
         getLogger().info("CustomFishing enabled!");
@@ -91,16 +86,15 @@ public class Customfishing extends JavaPlugin {
 
     @Override
     public void onDisable() {
+
+        // 魚データ保存
         if (dataManager != null) {
             dataManager.saveFishData();
         }
 
+        // サーバーレコード保存（例外安全）
         if (serverRecordData != null) {
-            try {
-                serverRecordData.save();
-            } catch (IOException e) {
-                getLogger().warning("ServerRecordData の保存に失敗しました: " + e.getMessage());
-            }
+            serverRecordData.save();
         }
     }
 
@@ -123,6 +117,14 @@ public class Customfishing extends JavaPlugin {
         return serverRecordData;
     }
 
+    public PlayerCatchData getPlayerFishData() {
+        return playerCatchData;
+    }
+
+    public FishDataManager getFishDataManager() {
+        return fishDataManager;
+    }
+
     // ===============================
     // Fishing ON / OFF API
     // ===============================
@@ -133,4 +135,5 @@ public class Customfishing extends JavaPlugin {
     public void setFishingEnabled(boolean enabled) {
         this.fishingEnabled = enabled;
     }
+
 }
